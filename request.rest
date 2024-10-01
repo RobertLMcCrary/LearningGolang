@@ -1,0 +1,21 @@
+### get all book
+GET http://localhost:8000/api/books
+Content-Type: application/json
+
+### get a book by ID
+GET http://localhost:8000/api/book/1
+Content-Type: application/json
+
+###add a book to the library
+POST http://localhost:8000/api/books
+Content-Type: application/json
+
+{
+    "ID": 10,
+    "Title": "Magic Tree House",
+    "Author": "author name"
+}
+
+### delete a book by id
+DELETE http://localhost:8000/api/book/1
+Content-Type: application/json
