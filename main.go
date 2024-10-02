@@ -1,12 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Book struct {
@@ -15,14 +17,29 @@ type Book struct {
 	Author string `json:"author"`
 }
 
-var Library []Book
+var db *sql.DB
 
 func main() {
+	//initialize the database
+	var err error
+	db, err = sql.Open("sqlite3", "./books.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	//create books table
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS books (
+		id TEXT PRIMARY KEY,
+		title TEXT,
+		author TEXT
+	)`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	//initialize router
 	r := mux.NewRouter()
-
-	//adding some sample data
-	Library = append(Library, Book{ID: "1", Title: "Harry Potter", Author: "JK Rowling"})
 
 	//routes
 	r.HandleFunc("/api/books", getItems).Methods("GET")
@@ -40,7 +57,25 @@ func main() {
 // get all items
 func getItems(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(Library)
+
+	rows, err := db.Query("SELECT id, title, author FROM books")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var books []Book
+	for rows.Next() {
+		var book Book
+		if err := rows.Scan(&book.ID, &book.Title, &book.Author); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		books = append(books, book)
+	}
+
+	json.NewEncoder(w).Encode(books)
 }
 
 // get item by id
@@ -48,14 +83,18 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
 
-	for _, book := range Library {
-		if book.ID == params["id"] {
-			json.NewEncoder(w).Encode(book)
+	var book Book
+	err := db.QueryRow("SELECT id, title, author FROM books WHERE id = ?", params["id"]).Scan(&book.ID, &book.Title, &book.Author)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			json.NewEncoder(w).Encode(&Book{})
 			return
 		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	json.NewEncoder(w).Encode(&Book{})
+	json.NewEncoder(w).Encode(book)
 }
 
 // create a book
@@ -64,7 +103,12 @@ func createBook(w http.ResponseWriter, r *http.Request) {
 	var book Book
 	_ = json.NewDecoder(r.Body).Decode(&book)
 
-	Library = append(Library, book)
+	_, err := db.Exec("INSERT INTO books (id, title, author) VALUES (?, ?, ?)", book.ID, book.Title, book.Author)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	json.NewEncoder(w).Encode(book)
 }
 
@@ -73,11 +117,11 @@ func deleteBook(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
 
-	for index, book := range Library {
-		if book.ID == params["id"] {
-			Library = append(Library[:index], Library[:index+1]...)
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+	_, err := db.Exec("DELETE FROM books WHERE id = ?", params["id"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

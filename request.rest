@@ -11,9 +11,9 @@ POST http://localhost:8000/api/books
 Content-Type: application/json
 
 {
-    "ID": 10,
-    "Title": "Magic Tree House",
-    "Author": "author name"
+    "ID": ,
+    "Title": "Harry Potter",
+    "Author": "JK Rowling"
 }
 
 ### delete a book by id
