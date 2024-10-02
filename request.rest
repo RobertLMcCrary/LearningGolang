@@ -11,7 +11,7 @@ POST http://localhost:8000/api/books
 Content-Type: application/json
 
 {
-    "ID": ,
+    "ID": 2,
     "Title": "Harry Potter",
     "Author": "JK Rowling"
 }
